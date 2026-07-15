@@ -425,9 +425,9 @@ function toast(msg, ms){
 
 async function loadData(){
   try{
-    const s = await window.storage.get('meowney:settings');
-    if(s && s.value){
-      const parsed = JSON.parse(s.value);
+    const s = localStorage.getItem('meowney:settings');
+    if(s){
+      const parsed = JSON.parse(s);
       settings = Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), parsed);
       settings.categories = Object.assign({}, DEFAULTS.categories, parsed.categories||{});
       settings.typeTags = Object.assign({}, DEFAULTS.typeTags, parsed.typeTags||{});
@@ -436,24 +436,24 @@ async function loadData(){
     }
   }catch(e){ /* first run, use defaults */ }
   try{
-    const t = await window.storage.get('meowney:transactions');
-    if(t && t.value) transactions = JSON.parse(t.value);
+    const t = localStorage.getItem('meowney:transactions');
+    if(t) transactions = JSON.parse(t);
   }catch(e){ transactions = []; }
   try{
-    const tr = await window.storage.get('meowney:transfers');
-    if(tr && tr.value) transfers = JSON.parse(tr.value);
+    const tr = localStorage.getItem('meowney:transfers');
+    if(tr) transfers = JSON.parse(tr);
   }catch(e){ transfers = []; }
 }
 async function saveSettings(){
-  try{ await window.storage.set('meowney:settings', JSON.stringify(settings)); }
+  try{ localStorage.setItem('meowney:settings', JSON.stringify(settings)); }
   catch(e){ toast('Gagal menyimpan pengaturan'); }
 }
 async function saveTransactions(){
-  try{ await window.storage.set('meowney:transactions', JSON.stringify(transactions)); }
+  try{ localStorage.setItem('meowney:transactions', JSON.stringify(transactions)); }
   catch(e){ toast('Gagal menyimpan riwayat'); }
 }
 async function saveTransfers(){
-  try{ await window.storage.set('meowney:transfers', JSON.stringify(transfers)); }
+  try{ localStorage.setItem('meowney:transfers', JSON.stringify(transfers)); }
   catch(e){ toast('Gagal menyimpan riwayat transfer'); }
 }
 
