@@ -415,11 +415,11 @@
 const DEFAULTS = {
   scriptUrl: '',
   categories: {
-    Income: ['Gaji','Bonus','THR','Jualan'],
-    Expense: ['Makan','Jajan','Transport','Skincare/Makeup','Belanja Online','Sedekah','Kesehatan','Hiburan','Lain-lain'],
-    Bill: ['Mama','BPJS','Kontrakan','Belanja Masak','Pulsa/Internet','Netflix']
+    Income: [],
+    Expense: [],
+    Bill: []
   },
-  accounts: ['BCA','Cash','CIMB','Bibit','Seabank','Blu BCA'],
+  accounts: [],
   typeTags: {
     Income: ['Main Job','Side Income','Gift','Other'],
     Expense: ['Needs','Wants','Saving'],
@@ -533,9 +533,13 @@ function renderTypeSeg(){
   document.getElementById('normalFields').style.display = state.type==='Transfer' ? 'none' : 'block';
   document.getElementById('transferFields').style.display = state.type==='Transfer' ? 'block' : 'none';
 }
-function renderChips(containerId, items, selected, onSelect){
+function renderChips(containerId, items, selected, onSelect, emptyMsg){
   const wrap = document.getElementById(containerId);
   wrap.innerHTML = '';
+  if(items.length===0 && emptyMsg){
+    wrap.innerHTML = '<div class="empty" style="padding:10px 0;">'+emptyMsg+'</div>';
+    return;
+  }
   items.forEach(name=>{
     const c = document.createElement('button');
     c.type='button'; c.className='chip'+(selected===name?' active':''); c.textContent=name;
@@ -548,14 +552,17 @@ function renderInputView(){
   if(state.type==='Transfer'){
     if(!state.trFrom) state.trFrom = settings.accounts[0]||null;
     if(!state.trTo) state.trTo = settings.accounts[1]||settings.accounts[0]||null;
-    renderChips('trFromChips', settings.accounts, state.trFrom, (name)=>{ state.trFrom=name; renderInputView(); });
-    renderChips('trToChips', settings.accounts, state.trTo, (name)=>{ state.trTo=name; renderInputView(); });
+    const accEmptyMsg = 'Belum ada akun. Sambungkan sheet & tap "Tarik data" di tab Ringkasan, atau tambah manual di tab Atur.';
+    renderChips('trFromChips', settings.accounts, state.trFrom, (name)=>{ state.trFrom=name; renderInputView(); }, accEmptyMsg);
+    renderChips('trToChips', settings.accounts, state.trTo, (name)=>{ state.trTo=name; renderInputView(); }, accEmptyMsg);
   } else {
     const cats = settings.categories[state.type]||[];
     if(!state.category || cats.indexOf(state.category)===-1) state.category = cats[0]||null;
-    renderChips('catChips', cats, state.category, (name)=>{ state.category=name; renderInputView(); });
+    const catEmptyMsg = 'Belum ada kategori. Sambungkan sheet & tap "Tarik data" di tab Ringkasan, atau tambah manual di tab Atur.';
+    renderChips('catChips', cats, state.category, (name)=>{ state.category=name; renderInputView(); }, catEmptyMsg);
 
-    renderChips('accChips', settings.accounts, state.account, (name)=>{ state.account=name; renderInputView(); });
+    const accEmptyMsg = 'Belum ada akun. Sambungkan sheet & tap "Tarik data" di tab Ringkasan, atau tambah manual di tab Atur.';
+    renderChips('accChips', settings.accounts, state.account, (name)=>{ state.account=name; renderInputView(); }, accEmptyMsg);
     if(!state.account) state.account = settings.accounts[0]||null;
 
     const tags = settings.typeTags[state.type]||[];
@@ -1015,9 +1022,23 @@ async function pullFromSheet(){
     balancesUpdatedAt = new Date().toISOString();
     await saveBalances();
 
+    let newCount = 0;
+    const sheetCats = json.categories || {};
+    ['Expense','Bill','Income'].forEach(type=>{
+      (sheetCats[type]||[]).forEach(name=>{
+        if(settings.categories[type].indexOf(name)===-1){ settings.categories[type].push(name); newCount++; }
+      });
+    });
+    (sheetCats.Channel||[]).forEach(name=>{
+      if(settings.accounts.indexOf(name)===-1){ settings.accounts.push(name); newCount++; }
+    });
+    await saveSettings();
+
     renderSummary();
     renderBalances();
-    toast('Data terbaru dari Sheet berhasil ditarik');
+    renderSettingsChips();
+    renderInputView();
+    toast(newCount>0 ? 'Data ditarik, '+newCount+' kategori/akun baru ditambahkan' : 'Data terbaru dari Sheet berhasil ditarik');
   }catch(e){
     toast('Gagal menarik data: '+e.message);
   }
@@ -1124,6 +1145,14 @@ document.querySelectorAll('[data-add]').forEach(btn=>{
     inp.value='';
     await saveSettings();
     renderAll();
+
+    const categoryType = kind==='account' ? 'Channel' : kind;
+    const result = await callScript({ action:'addCategory', categoryType, value: val });
+    if(result.success){
+      toast('"'+val+'" ditambah & disinkron ke sheet');
+    } else {
+      toast('"'+val+'" tersimpan di app, gagal sinkron ke sheet: '+(result.error||''));
+    }
   };
 });
 
