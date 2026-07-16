@@ -1022,23 +1022,23 @@ async function pullFromSheet(){
     balancesUpdatedAt = new Date().toISOString();
     await saveBalances();
 
-    let newCount = 0;
-    const sheetCats = json.categories || {};
-    ['Expense','Bill','Income'].forEach(type=>{
-      (sheetCats[type]||[]).forEach(name=>{
-        if(settings.categories[type].indexOf(name)===-1){ settings.categories[type].push(name); newCount++; }
-      });
-    });
-    (sheetCats.Channel||[]).forEach(name=>{
-      if(settings.accounts.indexOf(name)===-1){ settings.accounts.push(name); newCount++; }
-    });
+    let catMsg = '';
+    if(json.categories){
+      const sheetCats = json.categories;
+      settings.categories.Income = sheetCats.Income || [];
+      settings.categories.Expense = sheetCats.Expense || [];
+      settings.categories.Bill = sheetCats.Bill || [];
+      settings.accounts = sheetCats.Channel || [];
+      const total = settings.categories.Income.length + settings.categories.Expense.length + settings.categories.Bill.length + settings.accounts.length;
+      catMsg = ', '+total+' kategori/akun disamakan dgn sheet';
+    }
     await saveSettings();
 
     renderSummary();
     renderBalances();
     renderSettingsChips();
     renderInputView();
-    toast(newCount>0 ? 'Data ditarik, '+newCount+' kategori/akun baru ditambahkan' : 'Data terbaru dari Sheet berhasil ditarik');
+    toast('Data terbaru dari Sheet berhasil ditarik' + catMsg);
   }catch(e){
     toast('Gagal menarik data: '+e.message);
   }
