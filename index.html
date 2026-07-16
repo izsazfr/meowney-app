@@ -173,6 +173,15 @@
   .bal-row .nm{font-weight:600;}
   .bal-row .v{font-family:'IBM Plex Mono'; font-weight:600;}
   .bal-total{display:flex; justify-content:space-between; padding-top:10px; margin-top:4px; border-top:2px solid var(--plum); font-weight:700; font-size:14px;}
+  .hist-filter-row{display:flex; gap:8px; margin-bottom:10px;}
+  .hist-filter-row select{
+    padding:9px 10px; border-radius:10px; border:1px solid var(--line); background:var(--paper);
+    font-family:'Inter'; font-size:12.5px; color:var(--ink); max-width:45%;
+  }
+  .hist-filter-row input{flex:1; padding:9px 12px; font-size:12.5px;}
+  .pager{display:flex; align-items:center; justify-content:space-between; margin-top:10px; font-size:12.5px; color:var(--ink-soft);}
+  .pager button{border:1px solid var(--line); background:var(--card); border-radius:9px; padding:6px 12px; font-size:12.5px; font-weight:600; color:var(--ink); cursor:pointer;}
+  .pager button:disabled{opacity:.4; cursor:default;}
   .sync-btn{display:flex; align-items:center; gap:6px; font-size:12.5px;}
 </style>
 </head>
@@ -305,7 +314,13 @@
     </div>
     <div class="card">
       <span class="label">Riwayat bulan ini</span>
+      <div class="chipgrid" id="histTypeChips" style="margin-bottom:10px;"></div>
+      <div class="hist-filter-row">
+        <select id="histCatFilter"></select>
+        <input type="text" id="histSearchInput" placeholder="Cari catatan...">
+      </div>
       <div id="histList"></div>
+      <div class="pager" id="histPager"></div>
     </div>
     <div class="card">
       <span class="label">Riwayat transfer bulan ini</span>
@@ -423,6 +438,12 @@ let viewMonth = new Date();
 let editingId = null;
 let editState = {};
 let pieChartInst = null, trendChartInst = null;
+let currentMonthTx = [];
+let histFilterType = 'All';
+let histFilterCat = 'All';
+let histSearch = '';
+let histPage = 1;
+const HIST_PAGE_SIZE = 10;
 
 function todayStr(d){
   const dt = d || new Date();
@@ -702,6 +723,94 @@ function renderBalances(){
   wrap.appendChild(totalRow);
 }
 
+function renderHistTypeChips(){
+  const opts = [['All','Semua'],['Income','Pemasukan'],['Expense','Pengeluaran'],['Bill','Tagihan']];
+  renderChips('histTypeChips', opts.map(o=>o[1]), opts.find(o=>o[0]===histFilterType)[1], (label)=>{
+    histFilterType = opts.find(o=>o[1]===label)[0];
+    histFilterCat = 'All';
+    histPage = 1;
+    renderHistCatFilter();
+    renderHistoryList();
+  });
+}
+function renderHistCatFilter(){
+  const sel = document.getElementById('histCatFilter');
+  let cats = [];
+  if(histFilterType==='All'){
+    cats = [...new Set([...settings.categories.Income, ...settings.categories.Expense, ...settings.categories.Bill])];
+  } else {
+    cats = settings.categories[histFilterType]||[];
+  }
+  sel.innerHTML = '<option value="All">Semua kategori</option>' + cats.map(c=>'<option value="'+c+'"'+(c===histFilterCat?' selected':'')+'>'+c+'</option>').join('');
+  if(cats.indexOf(histFilterCat)===-1) histFilterCat='All';
+}
+function renderHistoryList(){
+  const filtered = currentMonthTx.filter(t=>{
+    if(histFilterType!=='All' && t.category!==histFilterType) return false;
+    if(histFilterCat!=='All' && t.subcategory!==histFilterCat) return false;
+    if(histSearch){
+      const q = histSearch.toLowerCase();
+      const hay = ((t.detail||'')+' '+(t.subcategory||'')+' '+(t.account||'')).toLowerCase();
+      if(hay.indexOf(q)===-1) return false;
+    }
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / HIST_PAGE_SIZE));
+  if(histPage > totalPages) histPage = totalPages;
+  if(histPage < 1) histPage = 1;
+  const start = (histPage-1) * HIST_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + HIST_PAGE_SIZE);
+
+  const histWrap = document.getElementById('histList');
+  histWrap.innerHTML = '';
+  if(filtered.length===0){
+    histWrap.innerHTML = '<div class="empty">Ga ada transaksi yang cocok</div>';
+  } else {
+    pageItems.forEach(t=>{
+      const row = document.createElement('div');
+      row.className='hist-item';
+      const sign = t.category==='Income' ? '+' : '-';
+      const cls = t.category==='Income' ? 'inc' : 'exp';
+      row.innerHTML = '<div class="hist-left">'
+          + '<div class="nm">'+t.subcategory+(t.detail? ' · '+t.detail:'')+'</div>'
+          + '<div class="meta">'+t.date+' · '+(t.account||'')
+          + ' <span class="tag '+(t.synced?'synced':'pending')+'">'+(t.synced?'tersinkron':'belum sinkron')+'</span></div>'
+        + '</div>'
+        + '<div class="hist-right">'
+          + '<div class="amt '+cls+'">'+sign+fmtRp(t.amount)+'</div>'
+        + '</div>';
+      const actions = document.createElement('div');
+      actions.style.display='flex';
+      const editBtn = document.createElement('button');
+      editBtn.className='icon-btn'; editBtn.textContent='✎'; editBtn.title='Edit';
+      editBtn.onclick = ()=> openEditModal(t);
+      const delBtn = document.createElement('button');
+      delBtn.className='icon-btn'; delBtn.textContent='✕'; delBtn.title='Hapus';
+      delBtn.onclick = ()=> quickDelete(t);
+      actions.appendChild(editBtn); actions.appendChild(delBtn);
+      row.querySelector('.hist-right').appendChild(actions);
+      histWrap.appendChild(row);
+    });
+  }
+
+  const pager = document.getElementById('histPager');
+  pager.innerHTML = '';
+  if(filtered.length > 0){
+    const prevBtn = document.createElement('button');
+    prevBtn.textContent = '‹ Sebelumnya';
+    prevBtn.disabled = histPage<=1;
+    prevBtn.onclick = ()=>{ histPage--; renderHistoryList(); };
+    const info = document.createElement('span');
+    info.textContent = 'Halaman '+histPage+' dari '+totalPages+' ('+filtered.length+' transaksi)';
+    const nextBtn = document.createElement('button');
+    nextBtn.textContent = 'Berikutnya ›';
+    nextBtn.disabled = histPage>=totalPages;
+    nextBtn.onclick = ()=>{ histPage++; renderHistoryList(); };
+    pager.appendChild(prevBtn); pager.appendChild(info); pager.appendChild(nextBtn);
+  }
+}
+
 function renderSummary(){
   const mk = monthKey(viewMonth);
   const monthNames = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
@@ -744,37 +853,10 @@ function renderSummary(){
     });
   }
 
-  const histWrap = document.getElementById('histList');
-  histWrap.innerHTML = '';
-  if(inMonth.length===0){
-    histWrap.innerHTML = '<div class="empty">Belum ada transaksi bulan ini</div>';
-  } else {
-    inMonth.slice(0,80).forEach(t=>{
-      const row = document.createElement('div');
-      row.className='hist-item';
-      const sign = t.category==='Income' ? '+' : '-';
-      const cls = t.category==='Income' ? 'inc' : 'exp';
-      row.innerHTML = '<div class="hist-left">'
-          + '<div class="nm">'+t.subcategory+(t.detail? ' · '+t.detail:'')+'</div>'
-          + '<div class="meta">'+t.date+' · '+(t.account||'')
-          + ' <span class="tag '+(t.synced?'synced':'pending')+'">'+(t.synced?'tersinkron':'belum sinkron')+'</span></div>'
-        + '</div>'
-        + '<div class="hist-right">'
-          + '<div class="amt '+cls+'">'+sign+fmtRp(t.amount)+'</div>'
-        + '</div>';
-      const actions = document.createElement('div');
-      actions.style.display='flex';
-      const editBtn = document.createElement('button');
-      editBtn.className='icon-btn'; editBtn.textContent='✎'; editBtn.title='Edit';
-      editBtn.onclick = ()=> openEditModal(t);
-      const delBtn = document.createElement('button');
-      delBtn.className='icon-btn'; delBtn.textContent='✕'; delBtn.title='Hapus';
-      delBtn.onclick = ()=> quickDelete(t);
-      actions.appendChild(editBtn); actions.appendChild(delBtn);
-      row.querySelector('.hist-right').appendChild(actions);
-      histWrap.appendChild(row);
-    });
-  }
+  currentMonthTx = inMonth;
+  renderHistTypeChips();
+  renderHistCatFilter();
+  renderHistoryList();
 
   const trWrap = document.getElementById('transferList');
   trWrap.innerHTML = '';
@@ -1004,9 +1086,11 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 });
 
 document.getElementById('saveBtn').onclick = handleSave;
-document.getElementById('prevMonth').onclick = ()=>{ viewMonth.setMonth(viewMonth.getMonth()-1); renderSummary(); };
-document.getElementById('nextMonth').onclick = ()=>{ viewMonth.setMonth(viewMonth.getMonth()+1); renderSummary(); };
+document.getElementById('prevMonth').onclick = ()=>{ viewMonth.setMonth(viewMonth.getMonth()-1); histPage=1; renderSummary(); };
+document.getElementById('nextMonth').onclick = ()=>{ viewMonth.setMonth(viewMonth.getMonth()+1); histPage=1; renderSummary(); };
 document.getElementById('pullBtn').onclick = pullFromSheet;
+document.getElementById('histCatFilter').onchange = (e)=>{ histFilterCat = e.target.value; histPage=1; renderHistoryList(); };
+document.getElementById('histSearchInput').oninput = (e)=>{ histSearch = e.target.value.trim(); histPage=1; renderHistoryList(); };
 document.getElementById('modalCancelBtn').onclick = closeEditModal;
 document.getElementById('modalSaveBtn').onclick = saveEditModal;
 document.getElementById('modalDeleteBtn').onclick = ()=>{
