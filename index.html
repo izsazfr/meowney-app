@@ -33,14 +33,15 @@
     --radius:16px;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html, body{overflow-x:hidden; width:100%;}
   body{
     margin:0; background:var(--paper); color:var(--ink);
     font-family:'Inter',system-ui,sans-serif;
-    padding-bottom:40px;
+    padding-bottom:calc(40px + env(safe-area-inset-bottom));
   }
-  .wrap{max-width:480px; margin:0 auto; padding:0 16px;}
+  .wrap{max-width:480px; margin:0 auto; padding:0 16px; width:100%;}
   header.top{
-    padding:22px 16px 16px; display:flex; align-items:center; gap:12px; justify-content:space-between;
+    padding:calc(22px + env(safe-area-inset-top)) 16px 16px; display:flex; align-items:center; gap:12px; justify-content:space-between;
     max-width:480px; margin:0 auto;
   }
   .top-left{display:flex; align-items:center; gap:12px;}
@@ -84,12 +85,13 @@
   .field{margin-bottom:16px;}
   input[type=text], input[type=number], input[type=date], input[type=url]{
     width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--line);
-    font-family:'Inter'; font-size:15px; background:var(--paper); color:var(--ink);
+    font-family:'Inter'; font-size:16px; background:var(--paper); color:var(--ink);
   }
   input[type=number]{font-family:'IBM Plex Mono'; font-weight:600; font-size:20px;}
+  .moneyfield{font-family:'IBM Plex Mono'; font-weight:600; font-size:20px;}
   .amtwrap{display:flex; align-items:center; gap:8px; background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:0 14px;}
   .amtwrap span{font-family:'IBM Plex Mono'; font-weight:600; color:var(--ink-soft); font-size:20px;}
-  .amtwrap input{border:none; background:transparent; padding:12px 0;}
+  .amtwrap input{border:none; background:transparent; padding:12px 0; font-family:'IBM Plex Mono'; font-weight:600; font-size:20px; color:var(--ink);}
   .amtwrap input:focus{outline:none;}
   input:focus{outline:2px solid var(--plum); outline-offset:1px;}
   .primary-btn{
@@ -127,9 +129,10 @@
   .empty{text-align:center; padding:28px 10px; color:var(--ink-soft); font-size:13.5px;}
   .hist-item{display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); gap:8px;}
   .hist-item:last-child{border-bottom:none;}
-  .hist-left .nm{font-weight:600; font-size:14px;}
-  .hist-left .meta{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
-  .hist-right{text-align:right; display:flex; align-items:center; gap:2px;}
+  .hist-left{flex:1; min-width:0;}
+  .hist-left .nm{font-weight:600; font-size:14px; overflow-wrap:anywhere;}
+  .hist-left .meta{font-size:11.5px; color:var(--ink-soft); margin-top:2px; overflow-wrap:anywhere;}
+  .hist-right{text-align:right; display:flex; align-items:center; gap:2px; flex-shrink:0;}
   .hist-right .amt{font-family:'IBM Plex Mono'; font-weight:600; font-size:14px; margin-right:4px;}
   .hist-right .amt.exp{color:var(--brick);}
   .hist-right .amt.inc{color:var(--sage);}
@@ -146,10 +149,10 @@
     opacity:0; transition:.25s; pointer-events:none; z-index:50; white-space:nowrap; max-width:90vw; overflow:hidden; text-overflow:ellipsis;
   }
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
-  .budget-input-row{display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line);}
+  .budget-input-row{display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); gap:8px;}
   .budget-input-row:last-child{border-bottom:none;}
-  .budget-input-row .nm{font-size:13.5px; font-weight:500;}
-  .budget-input-row input{width:120px; padding:8px 10px; font-size:13px;}
+  .budget-input-row .nm{font-size:13.5px; font-weight:500; flex:1; min-width:0; overflow-wrap:anywhere;}
+  .budget-input-row input{width:120px; flex-shrink:0; padding:8px 10px; font-size:13px;}
   .alert-card{border-radius:12px; padding:11px 14px; margin-bottom:10px; font-size:13px; font-weight:500;}
   .alert-card.warn{background:#FFF3D6; color:var(--mustard-deep);}
   .alert-card.over{background:var(--brick-bg); color:var(--brick);}
@@ -165,6 +168,11 @@
   .modal-title{font-family:'Fraunces',serif; font-weight:600; font-size:17px; margin:0 0 14px;}
   .modal-actions{display:flex; gap:8px; margin-top:14px;}
   .modal-actions .primary-btn{margin-top:0;}
+  .bal-row{display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--line); font-size:13.5px;}
+  .bal-row:last-child{border-bottom:none;}
+  .bal-row .nm{font-weight:600;}
+  .bal-row .v{font-family:'IBM Plex Mono'; font-weight:600;}
+  .bal-total{display:flex; justify-content:space-between; padding-top:10px; margin-top:4px; border-top:2px solid var(--plum); font-weight:700; font-size:14px;}
   .sync-btn{display:flex; align-items:center; gap:6px; font-size:12.5px;}
 </style>
 </head>
@@ -216,7 +224,7 @@
         <span class="label">Jumlah</span>
         <div class="amtwrap field">
           <span>Rp</span>
-          <input type="number" id="amtInput" placeholder="0" inputmode="numeric">
+          <input type="text" id="amtInput" placeholder="0" inputmode="numeric">
         </div>
 
         <span class="label">Akun</span>
@@ -235,7 +243,7 @@
         <span class="label">Jumlah</span>
         <div class="amtwrap field">
           <span>Rp</span>
-          <input type="number" id="trAmtInput" placeholder="0" inputmode="numeric">
+          <input type="text" id="trAmtInput" placeholder="0" inputmode="numeric">
         </div>
         <span class="label">Dari akun</span>
         <div class="chipgrid" id="trFromChips"></div>
@@ -273,6 +281,14 @@
     </div>
 
     <div id="alertWrap"></div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:8px;">
+        <span class="label" style="margin-bottom:0;">Saldo per akun</span>
+        <span class="sync-status" id="balanceUpdatedAt" style="margin-top:0;"></span>
+      </div>
+      <div id="balanceList"></div>
+    </div>
 
     <div class="card">
       <span class="label">Sebaran pengeluaran</span>
@@ -358,7 +374,7 @@
     <span class="label">Jumlah</span>
     <div class="amtwrap field">
       <span>Rp</span>
-      <input type="number" id="editAmtInput">
+      <input type="text" id="editAmtInput" inputmode="numeric">
     </div>
     <span class="label">Akun</span>
     <div class="chipgrid" id="editAccChips"></div>
@@ -400,6 +416,8 @@ const DEFAULTS = {
 let settings = JSON.parse(JSON.stringify(DEFAULTS));
 let transactions = [];
 let transfers = [];
+let balances = [];
+let balancesUpdatedAt = null;
 let state = { type:'Expense', category:null, account:null, typeTag:null, trFrom:null, trTo:null };
 let viewMonth = new Date();
 let editingId = null;
@@ -415,6 +433,17 @@ function fmtRp(n){
   return 'Rp' + n.toLocaleString('id-ID');
 }
 function stripDash(s){ return (s||'').replace(/^-\s*/, ''); }
+function parseAmt(el){ return Number((el.value||'').replace(/\D/g,'')) || 0; }
+function attachRupiahFormatting(el){
+  el.addEventListener('input', ()=>{
+    const raw = el.value.replace(/\D/g,'');
+    el.value = raw === '' ? '' : Number(raw).toLocaleString('id-ID');
+  });
+}
+function setAmtValue(el, n){
+  const v = Math.round(Number(n)||0);
+  el.value = v === 0 ? '' : v.toLocaleString('id-ID');
+}
 function toast(msg, ms){
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -443,6 +472,14 @@ async function loadData(){
     const tr = localStorage.getItem('meowney:transfers');
     if(tr) transfers = JSON.parse(tr);
   }catch(e){ transfers = []; }
+  try{
+    const b = localStorage.getItem('meowney:balances');
+    if(b){
+      const parsed = JSON.parse(b);
+      balances = parsed.balances || [];
+      balancesUpdatedAt = parsed.updatedAt || null;
+    }
+  }catch(e){ balances = []; balancesUpdatedAt = null; }
 }
 async function saveSettings(){
   try{ localStorage.setItem('meowney:settings', JSON.stringify(settings)); }
@@ -455,6 +492,10 @@ async function saveTransactions(){
 async function saveTransfers(){
   try{ localStorage.setItem('meowney:transfers', JSON.stringify(transfers)); }
   catch(e){ toast('Gagal menyimpan riwayat transfer'); }
+}
+async function saveBalances(){
+  try{ localStorage.setItem('meowney:balances', JSON.stringify({ balances, updatedAt: balancesUpdatedAt })); }
+  catch(e){ /* non-critical, ignore */ }
 }
 
 function renderTypeSeg(){
@@ -517,7 +558,7 @@ async function callScript(payload){
 
 async function handleSave(){
   if(state.type==='Transfer'){ return handleTransferSave(); }
-  const amount = Number(document.getElementById('amtInput').value);
+  const amount = parseAmt(document.getElementById('amtInput'));
   if(!amount || amount<=0){ toast('Isi jumlah dulu ya'); return; }
   if(!state.category){ toast('Pilih kategori dulu'); return; }
   const detail = document.getElementById('detailInput').value.trim();
@@ -560,7 +601,7 @@ async function handleSave(){
 }
 
 async function handleTransferSave(){
-  const amount = Number(document.getElementById('trAmtInput').value);
+  const amount = parseAmt(document.getElementById('trAmtInput'));
   if(!amount || amount<=0){ toast('Isi jumlah dulu ya'); return; }
   if(!state.trFrom || !state.trTo){ toast('Pilih akun asal & tujuan'); return; }
   if(state.trFrom === state.trTo){ toast('Akun asal & tujuan tidak boleh sama'); return; }
@@ -631,6 +672,34 @@ function checkBudgetAfterSave(type, cat){
   const pct = Math.round((spent/budget)*100);
   if(pct>=100) toast('Waduh, budget "'+cat+'" udah kelewat ('+pct+'%)', 3200);
   else if(pct>=80) toast('Hati-hati, budget "'+cat+'" udah '+pct+'%', 3200);
+}
+
+function renderBalances(){
+  const wrap = document.getElementById('balanceList');
+  wrap.innerHTML = '';
+  const updEl = document.getElementById('balanceUpdatedAt');
+  if(balancesUpdatedAt){
+    const d = new Date(balancesUpdatedAt);
+    updEl.textContent = 'Update: ' + d.toLocaleDateString('id-ID') + ' ' + d.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+  } else {
+    updEl.textContent = '';
+  }
+  if(!balances || balances.length===0){
+    wrap.innerHTML = '<div class="empty">Belum ada data. Tap "Tarik data" di atas.</div>';
+    return;
+  }
+  let total = 0;
+  balances.forEach(b=>{
+    total += Number(b.current)||0;
+    const row = document.createElement('div');
+    row.className='bal-row';
+    row.innerHTML = '<span class="nm">'+b.account+'</span><span class="v">'+fmtRp(b.current)+'</span>';
+    wrap.appendChild(row);
+  });
+  const totalRow = document.createElement('div');
+  totalRow.className='bal-total';
+  totalRow.innerHTML = '<span>Total</span><span>'+fmtRp(total)+'</span>';
+  wrap.appendChild(totalRow);
 }
 
 function renderSummary(){
@@ -773,7 +842,7 @@ function renderCharts(byCat){
 function openEditModal(tx){
   editingId = tx.id;
   editState = { category: tx.subcategory, account: tx.account, typeTag: tx.typeTag };
-  document.getElementById('editAmtInput').value = tx.amount;
+  setAmtValue(document.getElementById('editAmtInput'), tx.amount);
   document.getElementById('editDetailInput').value = tx.detail;
   document.getElementById('editDateInput').value = tx.date;
   renderEditChips(tx);
@@ -791,7 +860,7 @@ function closeEditModal(){
 async function saveEditModal(){
   const tx = transactions.find(t=>t.id===editingId);
   if(!tx) return closeEditModal();
-  const amount = Number(document.getElementById('editAmtInput').value);
+  const amount = parseAmt(document.getElementById('editAmtInput'));
   const detail = document.getElementById('editDetailInput').value.trim();
   const date = document.getElementById('editDateInput').value || tx.date;
   const payload = {
@@ -860,7 +929,12 @@ async function pullFromSheet(){
     transfers = [...localOnlyTr, ...sheetTr].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
     await saveTransfers();
 
+    balances = json.balances || [];
+    balancesUpdatedAt = new Date().toISOString();
+    await saveBalances();
+
     renderSummary();
+    renderBalances();
     toast('Data terbaru dari Sheet berhasil ditarik');
   }catch(e){
     toast('Gagal menarik data: '+e.message);
@@ -890,9 +964,10 @@ function renderSettingsChips(){
     row.className='budget-input-row';
     row.innerHTML = '<span class="nm">'+cat+'</span>';
     const inp = document.createElement('input');
-    inp.type='number'; inp.placeholder='0';
-    inp.value = settings.budgets[cat] || '';
-    inp.onchange = async ()=>{ settings.budgets[cat] = Number(inp.value)||0; await saveSettings(); renderSummary(); };
+    inp.type='text'; inp.inputMode='numeric'; inp.placeholder='0';
+    setAmtValue(inp, settings.budgets[cat] || 0);
+    attachRupiahFormatting(inp);
+    inp.onchange = async ()=>{ settings.budgets[cat] = parseAmt(inp); await saveSettings(); renderSummary(); };
     row.appendChild(inp);
     budgetEdit.appendChild(row);
   });
@@ -915,6 +990,7 @@ function renderManageChips(containerId, type){
 function renderAll(){
   renderInputView();
   renderSummary();
+  renderBalances();
   renderSettingsChips();
 }
 
@@ -980,6 +1056,9 @@ document.getElementById('resetBtn').onclick = async ()=>{
 };
 
 (async function init(){
+  attachRupiahFormatting(document.getElementById('amtInput'));
+  attachRupiahFormatting(document.getElementById('trAmtInput'));
+  attachRupiahFormatting(document.getElementById('editAmtInput'));
   await loadData();
   document.getElementById('dateInput').value = todayStr();
   renderAll();
