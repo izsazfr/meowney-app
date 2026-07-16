@@ -371,6 +371,7 @@
     </div>
     <div class="card">
       <span class="label">Budget bulanan per kategori (Rp)</span>
+      <div class="sub" style="margin-bottom:10px;">Ini nilai cadangan, dipakai kalau Budget Planner di sheet ga punya angka buat bulan yang lagi dilihat. Kalau ada, angka dari sheet yang menang.</div>
       <div id="budgetEditList"></div>
     </div>
     <div class="card">
@@ -425,7 +426,8 @@ const DEFAULTS = {
     Expense: ['Needs','Wants','Saving'],
     Bill: ['Needs','Wants','Saving']
   },
-  budgets: {}
+  budgets: {},
+  budgetsByMonth: {}
 };
 
 let settings = JSON.parse(JSON.stringify(DEFAULTS));
@@ -454,6 +456,12 @@ function fmtRp(n){
   return 'Rp' + n.toLocaleString('id-ID');
 }
 function stripDash(s){ return (s||'').replace(/^-\s*/, ''); }
+function getBudgetFor(cat, mk){
+  if(settings.budgetsByMonth && settings.budgetsByMonth[cat] && settings.budgetsByMonth[cat][mk]!=null){
+    return settings.budgetsByMonth[cat][mk];
+  }
+  return settings.budgets[cat] || 0;
+}
 function parseAmt(el){ return Number((el.value||'').replace(/\D/g,'')) || 0; }
 function attachRupiahFormatting(el){
   el.addEventListener('input', ()=>{
@@ -482,6 +490,7 @@ async function loadData(){
       settings.categories = Object.assign({}, DEFAULTS.categories, parsed.categories||{});
       settings.typeTags = Object.assign({}, DEFAULTS.typeTags, parsed.typeTags||{});
       settings.budgets = parsed.budgets || {};
+      settings.budgetsByMonth = parsed.budgetsByMonth || {};
       settings.accounts = parsed.accounts || DEFAULTS.accounts;
     }
   }catch(e){ /* first run, use defaults */ }
@@ -581,7 +590,21 @@ async function callScript(payload){
       body: JSON.stringify(payload)
     });
     return await res.json();
-  }catch(e){ return { success:false, error:e.message }; }
+  }catch(e){
+    // Apps Script POST sometimes hits a CORS/redirect quirk that GET doesn't.
+    // Retry once "blind" (no-cors): we can't read the response, but the write still goes through server-side.
+    try{
+      await fetch(settings.scriptUrl, {
+        method:'POST',
+        mode:'no-cors',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify(payload)
+      });
+      return { success:true, unconfirmed:true };
+    }catch(e2){
+      return { success:false, error:e.message };
+    }
+  }
 }
 
 async function handleSave(){
@@ -616,7 +639,9 @@ async function handleSave(){
   document.getElementById('detailInput').value = '';
   const statusEl = document.getElementById('syncStatus');
   if(result.success){
-    statusEl.textContent = 'Tersimpan & tersinkron ke Google Sheet';
+    statusEl.textContent = result.unconfirmed
+      ? 'Terkirim ke Sheet (ga bisa dikonfirmasi, cek manual kalau perlu)'
+      : 'Tersimpan & tersinkron ke Google Sheet';
     statusEl.className = 'sync-status ok';
     toast('Transaksi tersimpan');
     checkBudgetAfterSave(state.type, state.category);
@@ -677,11 +702,11 @@ function computeMonthData(mk){
   return { inMonth, inc, exp, byCat };
 }
 
-function computeBudgetWarnings(byCat){
+function computeBudgetWarnings(byCat, mk){
   const allExpCats = [...settings.categories.Expense, ...settings.categories.Bill];
   const warnings = [];
   allExpCats.forEach(cat=>{
-    const budget = settings.budgets[cat];
+    const budget = getBudgetFor(cat, mk);
     if(!budget || budget<=0) return;
     const spent = byCat[cat]||0;
     const pct = Math.round((spent/budget)*100);
@@ -693,8 +718,9 @@ function computeBudgetWarnings(byCat){
 
 function checkBudgetAfterSave(type, cat){
   if(type==='Income') return;
-  const { byCat } = computeMonthData(monthKey(new Date()));
-  const budget = settings.budgets[cat];
+  const mk = monthKey(new Date());
+  const { byCat } = computeMonthData(mk);
+  const budget = getBudgetFor(cat, mk);
   if(!budget || budget<=0) return;
   const spent = byCat[cat]||0;
   const pct = Math.round((spent/budget)*100);
@@ -832,7 +858,7 @@ function renderSummary(){
 
   const alertWrap = document.getElementById('alertWrap');
   alertWrap.innerHTML = '';
-  const warnings = computeBudgetWarnings(byCat);
+  const warnings = computeBudgetWarnings(byCat, mk);
   warnings.forEach(w=>{
     const el = document.createElement('div');
     el.className = 'alert-card ' + w.level;
@@ -843,13 +869,13 @@ function renderSummary(){
   const budgetWrap = document.getElementById('budgetList');
   budgetWrap.innerHTML = '';
   const allExpCats = [...settings.categories.Expense, ...settings.categories.Bill];
-  const withBudget = allExpCats.filter(c=>settings.budgets[c]>0);
+  const withBudget = allExpCats.filter(c=>getBudgetFor(c, mk)>0);
   if(withBudget.length===0){
-    budgetWrap.innerHTML = '<div class="empty">Belum ada budget diatur. Atur di tab Atur.</div>';
+    budgetWrap.innerHTML = '<div class="empty">Belum ada budget diatur. Atur di tab Atur, atau tarik dari Budget Planner di sheet.</div>';
   } else {
     withBudget.forEach(cat=>{
       const spent = byCat[cat]||0;
-      const budget = settings.budgets[cat];
+      const budget = getBudgetFor(cat, mk);
       const pct = Math.min(100, Math.round((spent/budget)*100));
       const cls = pct>=100 ? 'over' : pct>=80 ? 'warn' : '';
       const item = document.createElement('div');
@@ -1031,6 +1057,10 @@ async function pullFromSheet(){
       settings.accounts = sheetCats.Channel || [];
       const total = settings.categories.Income.length + settings.categories.Expense.length + settings.categories.Bill.length + settings.accounts.length;
       catMsg = ', '+total+' kategori/akun disamakan dgn sheet';
+    }
+    if(json.budgets){
+      settings.budgetsByMonth = json.budgets;
+      catMsg += ', budget bulanan ditarik';
     }
     await saveSettings();
 
